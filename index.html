@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Scrum Primer × 時間數據 交叉分析</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{--blue:#3b82f6;--sub:#64748b;--border:#e2e8f0;--bg:#f8fafc;--card:#fff;--text:#1e293b}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,"Microsoft JhengHei",sans-serif;background:var(--bg);color:var(--text)}
+.header{background:#fff;border-bottom:1px solid var(--border);padding:16px 32px}
+.hdr{font-size:1.2rem;font-weight:700;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.en{font-size:.82rem;font-weight:400;color:var(--sub)}
+.hsub{margin-top:4px;font-size:.74rem;color:var(--sub)}
+.tabs{display:flex;flex-wrap:wrap;justify-content:center;padding:6px 24px 0;background:#fff;border-bottom:1px solid var(--border)}
+.tab{padding:7px 11px;cursor:pointer;font-size:.79rem;font-weight:500;color:var(--sub);white-space:nowrap;border-bottom:2px solid transparent}
+.tab:hover{color:var(--text)}.tab.active{color:var(--blue);border-bottom-color:var(--blue);font-weight:600}
+.section{display:none;padding:18px 32px;max-width:1280px;margin:0 auto}.section.active{display:block}
+/* Loading overlay */
+#loadingOverlay{position:fixed;inset:0;background:rgba(255,255,255,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999}
+#loadingOverlay h2{font-size:1.1rem;color:var(--text);margin-bottom:8px}
+#loadingOverlay p{font-size:.83rem;color:var(--sub);margin-bottom:20px}
+.spinner{width:36px;height:36px;border:3px solid #e2e8f0;border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#loadErr{display:none;margin-top:12px;padding:10px 16px;background:#fff5f5;border:1px solid #fecaca;border-radius:8px;font-size:.82rem;color:#dc2626;max-width:480px;text-align:center}
+/* Stats */
+.stats{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:16px}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:9px;padding:12px 10px;text-align:center}
+.sl{font-size:.66rem;color:var(--sub)}.sl .en{display:block;font-size:.63rem;opacity:.7;margin-top:1px}
+.sv{font-size:1.5rem;font-weight:700;margin:4px 0 2px;line-height:1}
+.sv.green{color:#16a34a}.sv.orange{color:#d97706}.sv.red{color:#dc2626}.sv.blue{color:#2563eb}
+.sf{font-size:.66rem;color:var(--sub)}
+/* Focus threshold block */
+.ft-block{background:var(--card);border:1px solid var(--border);border-radius:9px;padding:14px 16px;margin-bottom:16px}
+.ft-row{display:flex;gap:16px;align-items:stretch;flex-wrap:wrap}
+.ft-col{flex:1;min-width:120px;border-radius:8px;padding:11px;text-align:center}
+.ft-col.c78{background:#f0fdf4;border:1px solid #bbf7d0}.ft-col.c65{background:#fefce8;border:1px solid #fde68a}.ft-col.crit{background:#fff5f5;border:1px solid #fecaca}
+.ft-col .lbl{font-size:.69rem;color:var(--sub);margin-bottom:3px;font-weight:600}
+.ft-col .num{font-size:1.7rem;font-weight:800;line-height:1}
+.ft-col.c78 .num{color:#16a34a}.ft-col.c65 .num{color:#d97706}.ft-col.crit .num{color:#dc2626}
+.ft-col .sub{font-size:.67rem;color:var(--sub);margin-top:2px}
+/* Cards */
+.card{background:var(--card);border:1px solid var(--border);border-radius:9px;padding:15px 17px;margin-bottom:13px}
+.ct{font-size:.86rem;font-weight:600;margin-bottom:1px}
+.cs{display:block;font-size:.72rem;color:var(--sub);margin-top:2px;margin-bottom:10px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:13px}
+.banner{padding:9px 13px;border-radius:8px;font-size:.8rem;margin-bottom:11px;display:flex;gap:8px;line-height:1.5;align-items:flex-start}
+.banner.warn{background:#fef3c7;border:1px solid #fcd34d;color:#92400e}
+.banner.info{background:#dbeafe;border:1px solid #93c5fd;color:#1e40af}
+.banner a{color:#1e40af}
+/* LT boxes */
+.lt-boxes{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:8px}
+.lt-box{border-radius:8px;padding:11px;text-align:center;border:1px solid var(--border)}
+.lt-box .pct{font-size:.68rem;color:var(--sub);margin-bottom:3px;font-weight:600}
+.lt-box .val{font-size:1.8rem;font-weight:800;line-height:1}
+.lt-box .unit{font-size:.68rem;color:var(--sub);margin-top:2px}
+.lt-box.p50{background:#eff6ff}.lt-box.p85{background:#fef3c7}.lt-box.p98{background:#fff1f2}
+.lt-box.p50 .val{color:#2563eb}.lt-box.p85 .val{color:#d97706}.lt-box.p98 .val{color:#dc2626}
+.ratio-row{font-size:.8rem;color:#64748b;padding:6px 2px;margin-bottom:9px}
+.ratio-val{font-weight:800;color:#7c3aed;font-size:1rem}
+.filter-bar{display:flex;gap:6px;margin-bottom:11px;flex-wrap:wrap;align-items:center}
+.fb{padding:4px 11px;border-radius:15px;border:1px solid var(--border);cursor:pointer;font-size:.78rem;background:var(--card);color:var(--sub)}
+.fb.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+/* Focus bars */
+.focus-row{display:flex;align-items:center;gap:9px;margin-bottom:5px}
+.fl{width:50px;font-size:.76rem;font-weight:600;flex-shrink:0;display:flex;flex-direction:column}
+.fc{font-size:.63rem;color:var(--sub);font-weight:400}
+.fw{flex:1;height:18px;background:#f1f5f9;border-radius:4px;position:relative}
+.fb2{height:100%;border-radius:4px}
+.fr{position:absolute;top:-3px;bottom:-3px;width:2px;background:#1d4ed8;left:78%;border-radius:2px;opacity:.5}
+.fv{width:80px;font-size:.76rem;font-weight:600;flex-shrink:0;text-align:right}
+.fleg{display:flex;gap:12px;margin:8px 0 3px;font-size:.73rem;color:var(--sub);flex-wrap:wrap}
+/* Frag */
+.frag-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:9px}
+.frag-badge{border-radius:6px;padding:6px 4px;text-align:center;font-size:.71rem;font-weight:600}
+.frag-badge .wl{font-size:.62rem;color:var(--sub);font-weight:400;margin-bottom:2px}
+.frag-badge.HIGH{background:#fee2e2;color:#991b1b;border:1px solid #fca5a5}
+.frag-badge.MEDIUM{background:#fef3c7;color:#92400e;border:1px solid #fcd34d}
+.frag-badge.LOW{background:#d1fae5;color:#065f46;border:1px solid #6ee7b7}
+.atbl{width:100%;border-collapse:collapse;font-size:.8rem}
+.atbl th{background:#f1f5f9;padding:6px 9px;text-align:left;font-weight:600;font-size:.72rem}
+.atbl td{padding:6px 9px;border-bottom:1px solid var(--border)}
+.pill{display:inline-block;padding:1px 7px;border-radius:9px;font-size:.67rem;font-weight:600}
+.pill.red{background:#fee2e2;color:#991b1b}.pill.orange{background:#fef3c7;color:#92400e}
+.insight-list{display:flex;flex-direction:column;gap:9px}
+.insight-item{padding:11px 13px;border-radius:8px;border-left:4px solid;line-height:1.5}
+.insight-item.warn{background:#fff5f5;border-left-color:#ef4444}
+.insight-item.ok{background:#f0fdf4;border-left-color:#10b981}
+.iz{font-size:.85rem;font-weight:500;margin-bottom:3px}
+.ie{font-size:.77rem;color:var(--sub)}
+.thru-table{width:100%;border-collapse:collapse;font-size:.8rem}
+.thru-table th{background:#f1f5f9;padding:6px 9px;font-weight:600;font-size:.72rem;text-align:left}
+.thru-table td{padding:6px 9px;border-bottom:1px solid var(--border)}
+.goal-tiles{display:grid;grid-template-columns:repeat(14,1fr);gap:4px;margin-top:7px}
+.goal-tile{border-radius:6px;padding:7px 3px;text-align:center;color:#fff}
+.tile-legend{display:flex;gap:11px;margin:8px 0 5px;font-size:.73rem;flex-wrap:wrap}
+.tile-legend span{display:flex;align-items:center;gap:4px}
+.tile-legend .dot{width:11px;height:11px;border-radius:3px;display:inline-block}
+.tm-wrap{position:relative;height:16px;margin-bottom:3px}
+.tm{position:absolute;font-size:.68rem;color:var(--sub);transform:translateX(-50%)}
+@media(max-width:1100px){.stats{grid-template-columns:repeat(3,1fr)}.g2{grid-template-columns:1fr}}
+@media(max-width:600px){.stats{grid-template-columns:repeat(2,1fr)}.section{padding:12px}.goal-tiles{grid-template-columns:repeat(7,1fr)}.frag-grid{grid-template-columns:repeat(4,1fr)}}
+</style>
+</head>
+<body>
+
+<!-- Loading overlay -->
+<div id="loadingOverlay">
+  <div class="spinner"></div>
+  <h2 style="margin-top:16px">載入最新資料中 Loading latest data…</h2>
+  <p>正在從 Google Sheets 抓取 6 個工作表<br>Fetching 6 sheets from Google Sheets</p>
+  <div id="loadErr"></div>
+</div>
+
+<div id="appContent" style="display:none">
+<div class="header">
+  <div class="hdr">Scrum Primer × 時間數據 交叉分析 <span class="en">Scrum Primer × Time Data Cross-Sheet Analysis</span></div>
+  <div class="hsub" id="headerSub">S5–S18 · 載入中… 🟡</div>
+</div>
+<div class="tabs">
+  <div class="tab active" onclick="showTab('overview',this)">📊 Overview 總覽</div>
+  <div class="tab" onclick="showTab('throughput',this)">📦 Throughput 交付量</div>
+  <div class="tab" onclick="showTab('leadtime',this)">⏱️ Lead Time</div>
+  <div class="tab" onclick="showTab('goals',this)">🎯 Sprint Goals 目標</div>
+  <div class="tab" onclick="showTab('focus',this)">🔵 Focus 專注</div>
+  <div class="tab" onclick="showTab('waste',this)">♻️ Waste 浪費</div>
+  <div class="tab" onclick="showTab('meetings',this)">📅 Meetings 會議</div>
+  <div class="tab" onclick="showTab('scrum',this)">🏃 Scrum Health</div>
+  <div class="tab" onclick="showTab('breakdown',this)">🧩 Breakdown 細目</div>
+  <div class="tab" onclick="showTab('diagnosis',this)">🔬 Diagnosis 診斷</div>
+  <div class="tab" onclick="showTab('insights',this)">💡 Insights 洞察</div>
+</div>
+
+<div id="tab-overview" class="section active">
+  <div class="stats" id="statsRow">
+    <div class="stat"><div class="sl">平均專注時間<span class="en">Avg Focus Time</span></div><div class="sv" id="s-focus">—</div><div class="sf">建議 ≥78% / Target ≥78%</div></div>
+    <div class="stat"><div class="sl">低於標準週數<span class="en">Below Benchmark</span></div><div class="sv" id="s-below">—</div><div class="sf">Focus &lt; 78%</div></div>
+    <div class="stat"><div class="sl">危急週數<span class="en">Critical Weeks</span></div><div class="sv" id="s-crit">—</div><div class="sf">Focus &lt; 65%</div></div>
+    <div class="stat"><div class="sl">PBR 平均超時<span class="en">Avg PBR Overtime</span></div><div class="sv" id="s-pbr">—</div><div class="sf">超時週平均 / Avg overrun</div></div>
+    <div class="stat"><div class="sl">Goal 達成率<span class="en">Goal Achievement</span></div><div class="sv" id="s-goal">—</div><div class="sf" id="s-goal-n">—</div></div>
+    <div class="stat"><div class="sl">Commit 達成率<span class="en">Commitment Done</span></div><div class="sv" id="s-commit">—</div><div class="sf" id="s-commit-n">—</div></div>
+  </div>
+  <div class="ft-block">
+    <div style="font-size:.83rem;font-weight:700;margin-bottom:10px">專注時間閾值分析 Focus Time Threshold Analysis <span style="font-size:.72rem;font-weight:400;color:var(--sub)">以實際工時為分母 / based on actual sprint hours</span></div>
+    <div class="ft-row">
+      <div class="ft-col c78"><div class="lbl">達到 ≥78%（Scrum Primer 標準）<br>On Target ≥78%</div><div class="num" id="ft-78">—</div><div class="sub" id="ft-78-pct">—</div></div>
+      <div class="ft-col c65"><div class="lbl">達到 ≥65%（最低要求）<br>Acceptable Floor ≥65%</div><div class="num" id="ft-65">—</div><div class="sub" id="ft-65-pct">—</div></div>
+      <div class="ft-col crit"><div class="lbl">危急 &lt;65%（需關注）<br>Critical &lt;65%</div><div class="num" id="ft-crit">—</div><div class="sub" id="ft-crit-sub">—</div></div>
+      <div style="flex:2;min-width:180px"><canvas id="focusHistChart" style="height:80px"></canvas></div>
+    </div>
+  </div>
+  <div class="card"><div class="ct">Weekly Time Allocation 每週時間分配<span class="cs">依類別堆疊 Stacked by category（時數 hours）</span></div><canvas id="stackedChart" height="135"></canvas></div>
+</div>
+
+<div id="tab-throughput" class="section">
+  <div class="banner info">📦 Throughput = PBI sheet 中每個 Sprint 狀態為 Done 的 item 數量 / # items with status Done per sprint</div>
+  <div class="g2">
+    <div class="card"><div class="ct">Sprint Throughput 交付量<span class="cs">Done items · 3-Sprint 滾動平均 / rolling avg · 紅點=零交付 red dot=zero</span></div><canvas id="throughputChart" height="220"></canvas></div>
+    <div class="card" style="overflow:auto"><div class="ct">Sprint 交付彙整 Sprint Delivery Summary</div>
+      <table class="thru-table"><tr><th>Sprint</th><th>工作日 Working Days</th><th>完成 Done</th><th>主要交付內容 Key Deliverables</th></tr><tbody id="thruTableBody"></tbody></table>
+    </div>
+  </div>
+</div>
+
+<div id="tab-leadtime" class="section">
+  <div class="banner info">
+    <div>📐 <strong>Lead Time 計算方式 / Calculation：</strong>PBI W 欄（Lead Time 天數 / days per item）、K 欄（完成日期 / completion date, dd/mm/yyyy）判斷年份。2025：row 3–72（70 items）· 2026：row 73+（31 items）· Excel PERCENTILE 插值法：<code>=PERCENTILE(W_range, 0.5)</code></div>
+  </div>
+  <div class="g2">
+    <div>
+      <div style="font-size:.85rem;font-weight:700;margin-bottom:7px;color:#1e40af">📅 2026</div>
+      <div class="filter-bar">
+        <span style="font-size:.74rem;color:var(--sub)">篩選 Filter：</span>
+        <button class="fb lt-btn-2026 active" onclick="setLtFilter('2026','all',this)">全年 All</button>
+        <button class="fb lt-btn-2026" onclick="setLtFilter('2026','Q1',this)">Q1</button>
+        <button class="fb lt-btn-2026" onclick="setLtFilter('2026','Q2',this)">Q2</button>
+        <button class="fb lt-btn-2026" onclick="setLtFilter('2026','Q3',this)">Q3</button>
+        <span id="lt-n-2026" style="font-size:.73rem;color:var(--sub);margin-left:4px">n=—</span>
+      </div>
+      <div class="lt-boxes">
+        <div class="lt-box p50"><div class="pct">p50 · Median</div><div class="val" id="lt-p50-2026">—</div><div class="unit">days 天</div></div>
+        <div class="lt-box p85"><div class="pct">p85 · SLA 目標</div><div class="val" id="lt-p85-2026">—</div><div class="unit">days 天</div></div>
+        <div class="lt-box p98"><div class="pct">p98 · Outlier 離群</div><div class="val" id="lt-p98-2026">—</div><div class="unit">days 天</div></div>
+      </div>
+      <div class="ratio-row">p98 ÷ p50 比值 / Ratio: <span class="ratio-val" id="lt-ratio-2026">—</span> <span style="font-size:.69rem">越高代表離散越大 / higher = more variance</span></div>
+    </div>
+    <div>
+      <div style="font-size:.85rem;font-weight:700;margin-bottom:7px;color:#92400e">📅 2025</div>
+      <div class="filter-bar">
+        <span style="font-size:.74rem;color:var(--sub)">篩選 Filter：</span>
+        <button class="fb lt-btn-2025 active" onclick="setLtFilter('2025','all',this)">全年 All</button>
+        <button class="fb lt-btn-2025" onclick="setLtFilter('2025','Q1',this)">Q1</button>
+        <button class="fb lt-btn-2025" onclick="setLtFilter('2025','Q2',this)">Q2</button>
+        <button class="fb lt-btn-2025" onclick="setLtFilter('2025','Q3',this)">Q3</button>
+        <span id="lt-n-2025" style="font-size:.73rem;color:var(--sub);margin-left:4px">n=—</span>
+      </div>
+      <div class="lt-boxes">
+        <div class="lt-box p50"><div class="pct">p50 · Median</div><div class="val" id="lt-p50-2025">—</div><div class="unit">days 天</div></div>
+        <div class="lt-box p85"><div class="pct">p85 · SLA 目標</div><div class="val" id="lt-p85-2025">—</div><div class="unit">days 天</div></div>
+        <div class="lt-box p98"><div class="pct">p98 · Outlier 離群</div><div class="val" id="lt-p98-2025">—</div><div class="unit">days 天</div></div>
+      </div>
+      <div class="ratio-row">p98 ÷ p50 比值 / Ratio: <span class="ratio-val" id="lt-ratio-2025">—</span></div>
+    </div>
+  </div>
+  <div class="card"><div class="ct">Lead Time Frequency Distribution 頻率分布比較<span class="cs">天數出現頻率 / frequency by days · 藍=2026 blue · 橙=2025 orange</span></div><canvas id="ltFreqChart" height="75"></canvas></div>
+  <div class="card"><div class="ct">季度比較 Quarterly Comparison<span class="cs">p50/p85/p98（天 days）</span></div>
+    <table class="atbl"><tr><th>Quarter 季度</th><th style="background:#eff6ff;color:#1e40af">2026 (p50/p85/p98)</th><th style="background:#fef3c7;color:#92400e">2025 (p50/p85/p98)</th></tr><tbody id="ltQRows"></tbody></table>
+  </div>
+  <div class="card"><div class="ct">Feature Design Lead Time（Design SBI · U 欄 / col U）<span class="cs" id="dlt-avg-line">—</span></div>
+    <table class="atbl"><tr><th>Sprint</th><th>Feature 功能</th><th>Lead Time 天數</th><th>狀態 Status</th></tr><tbody id="dltTableBody"></tbody></table>
+  </div>
+</div>
+
+<div id="tab-goals" class="section">
+  <div class="card"><div class="ct">Scrum Event Hours × Goal × Commitment · 右軸 每日平均人數<span class="cs">Bar color = outcome · Right axis = avg daily headcount 右軸=每日平均人數</span></div><canvas id="goalBarChart" height="60"></canvas></div>
+  <div class="card"><div class="ct">Sprint Goal 全覽 Overview（格子顏色 Tile color = 結果 outcome）</div>
+    <div class="tile-legend">
+      <span><span class="dot" style="background:#10b981"></span>Goal✓ Commit✓</span>
+      <span><span class="dot" style="background:#f59e0b"></span>Goal✓/Commit✗</span>
+      <span><span class="dot" style="background:#ef4444"></span>Goal✗ Commit✗</span>
+      <span><span class="dot" style="background:#374151"></span>Sprint 終止 Sprint Stop</span>
+    </div>
+    <div class="tm-wrap" id="tileMsWrap"></div>
+    <div class="goal-tiles" id="goalTiles"></div>
+  </div>
+</div>
+
+<div id="tab-focus" class="section">
+  <div class="banner info">📖 <strong>Scrum Primer：Focus ≥ 78% of actual sprint capacity 實際 Sprint 容量的 78%。</strong></div>
+  <div class="card"><div class="ct">Focus % Trend 專注時間趨勢<span class="cs">藍=實際 actual · 深藍虛=78% benchmark · 紅虛=65% floor</span></div><canvas id="focusTrendChart" height="65"></canvas></div>
+  <div class="card"><div class="ct">Focus Time per Sprint 每 Sprint 專注時間<span class="cs">🟢≥78% · 🟡65–77% · 🔴&lt;65% · 藍線 blue=78% · label=實際工時 actual hours</span></div>
+    <div class="fleg">
+      <span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#10b981"></span>≥78%</span>
+      <span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#f59e0b"></span>65–77%</span>
+      <span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#ef4444"></span>&lt;65%</span>
+      <span><span style="display:inline-block;width:13px;height:2px;background:#1d4ed8;vertical-align:middle"></span>78%</span>
+    </div>
+    <div id="focusBars"></div>
+    <div id="focusSummary" style="margin-top:8px;font-size:.75rem;color:var(--sub)"></div>
+  </div>
+</div>
+
+<div id="tab-waste" class="section">
+  <div class="banner warn">♻️ Scrum Events within timebox are healthy 時間箱內的 Scrum 事件是健康的 — only overtime counts as waste 僅超時部分計為浪費。</div>
+  <div class="g2">
+    <div class="card"><div class="ct">Waste per Sprint 每週浪費類型<span class="cs">堆疊時數 stacked hours</span></div><canvas id="wasteStackChart" height="190"></canvas></div>
+    <div class="card"><div class="ct">Total Waste by Type 各類型累計<span class="cs">跨 Sprint 總時數 total hours</span></div><canvas id="wasteDonutChart" height="190"></canvas></div>
+  </div>
+  <div class="card"><div class="ct">浪費計算說明 Waste Formula Reference 計算方式</div>
+    <table class="atbl" style="margin-top:7px">
+      <tr><th>類型 Type</th><th>公式 Formula</th><th>說明 Description</th></tr>
+      <tr><td><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:#374151;vertical-align:middle;margin-right:5px"></span>干擾 Interruptions</td><td style="font-family:monospace;font-size:.77rem">= Support hours</td><td style="font-size:.77rem;color:#64748b">計畫外協助、Bug分類 / Unplanned help, bug triage</td></tr>
+      <tr><td><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:#f59e0b;vertical-align:middle;margin-right:5px"></span>Extra Process 額外流程</td><td style="font-family:monospace;font-size:.77rem">= Dept Auto + max(0,Scrum−6hr) + max(0,Sharing−1hr)</td><td style="font-size:.77rem;color:#64748b">超出健康範圍 / Beyond healthy ceremony overhead</td></tr>
+      <tr><td><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:#8b5cf6;vertical-align:middle;margin-right:5px"></span>Task Switching 任務切換</td><td style="font-family:monospace;font-size:.77rem">= Meet Customer + max(0,Co-work−1.5hr)</td><td style="font-size:.77rem;color:#64748b">非計畫接觸 / Unplanned contact or excess handoffs</td></tr>
+      <tr><td><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:#f97316;vertical-align:middle;margin-right:5px"></span>Rework Risk 返工風險</td><td style="font-family:monospace;font-size:.77rem">= max(0, total×10% − Discovery hrs)</td><td style="font-size:.77rem;color:#64748b">探索不足10%目標 / Discovery below 10% target</td></tr>
+    </table>
+  </div>
+</div>
+
+<div id="tab-meetings" class="section">
+  <div class="filter-bar">
+    <span style="font-size:.74rem;color:var(--sub)">區間 Period：</span>
+    <button class="fb mtg-btn active" onclick="setMtgFilter('last4',this)">最近四週 Last 4</button>
+    <button class="fb mtg-btn" onclick="setMtgFilter('Q1',this)">Q1</button>
+    <button class="fb mtg-btn" onclick="setMtgFilter('Q2',this)">Q2</button>
+    <button class="fb mtg-btn" onclick="setMtgFilter('Q3',this)">Q3</button>
+  </div>
+  <div class="card"><div class="ct">Meeting Hours + Load % 會議時數 + 負荷百分比<span class="cs">長條=各類別時數（左軸 left）/ hours by category · 折線=負荷% line=load%（右軸 right）· 橙虛=22% 警戒 threshold</span></div><canvas id="mtgComboChart" height="88"></canvas></div>
+</div>
+
+<div id="tab-scrum" class="section">
+  <div class="banner info">📖 Scrum timebox baseline 時間箱基準 ≈ 4.5–5hr/Sprint：Planning 2hr + Review 1hr + Retro ~1hr + Daily×4 1hr</div>
+  <div class="g2">
+    <div class="card"><div class="ct">Scrum Event Hours vs 4.5hr Timebox 時間箱<span class="cs">超過紅虛線 above red line = 超時 overtime</span></div><canvas id="scrumChart" height="125"></canvas></div>
+    <div class="card"><div class="ct">Discovery % vs 10% Target 探索時間目標<span class="cs">Discovery = PBR + Design Review · 目標 target 10%</span></div><canvas id="discoveryChart" height="125"></canvas></div>
+  </div>
+</div>
+
+<div id="tab-breakdown" class="section">
+  <div class="filter-bar">
+    <span style="font-size:.74rem;color:var(--sub)">區間 Period：</span>
+    <button class="fb bd-btn active" onclick="setBdFilter('last4',this)">最近四週 Last 4</button>
+    <button class="fb bd-btn" onclick="setBdFilter('Q1',this)">Q1</button>
+    <button class="fb bd-btn" onclick="setBdFilter('Q2',this)">Q2</button>
+    <button class="fb bd-btn" onclick="setBdFilter('Q3',this)">Q3</button>
+  </div>
+  <div class="g2">
+    <div class="card"><div class="ct">全貌（含 Non-meeting）Full Breakdown<span class="cs">含非會議時間 including focus time / all categories</span></div><canvas id="bdFullChart" height="175"></canvas></div>
+    <div class="card"><div class="ct">會議細目 + Focus % 水位線 Meeting Detail + Focus Watermark<span class="cs">會議類別 meeting categories · 折線=Focus%（右軸）· 藍虛=78% · 紅虛=65%</span></div><canvas id="bdMtgChart" height="175"></canvas></div>
+  </div>
+</div>
+
+<div id="tab-diagnosis" class="section">
+  <div class="card"><div class="ct">Fragmentation Risk 碎片化風險<span class="cs">每週 per sprint</span></div><div class="frag-grid" id="fragGrid"></div></div>
+  <div class="card"><div class="ct">Anomaly Flags 異常標記</div>
+    <table class="atbl"><tr><th>Sprint</th><th>Flag 異常</th><th>Value 數值</th><th>Status 狀態</th></tr><tbody id="anomalyBody"></tbody></table>
+  </div>
+</div>
+
+<div id="tab-insights" class="section">
+  <div class="card"><div class="ct">Insights & Recommendations 洞察與行動建議</div><div class="insight-list" id="insightList"></div></div>
+  <div class="banner info" style="margin-top:12px">ℹ️ 資料每次開啟頁面自動從 Google Sheets 更新 / Data auto-refreshes from Google Sheets on every page load.</div>
+</div>
+</div><!-- end appContent -->
+
+<script>
+// ════════════════════════════════════════════════════════════
+// CONFIG — Google Sheet CSV export URLs
+// ════════════════════════════════════════════════════════════
+const APPS_SCRIPT_URL = 'https://script.google.com/a/macros/titansoft.com.sg/s/AKfycbwGLHZwJ4EYHgr2i83u60chnSe1N3IIMw9wtMvIrlRQzGoKOG9dIkbhe6ShTnbzZ2_E/exec';
+
+const G = '#f1f5f9';
+const CAT_COLORS = {
+  'Non-meeting':'#3b82f6','Scrum Event':'#8b5cf6','Discovery':'#0d9488',
+  'Support':'#ef4444','Department Autonomy':'#f59e0b','Meet Customer':'#10b981',
+  'Co-work':'#6366f1','Sharing':'#ec4899'
+};
+const CAT_ZH = {
+  'Non-meeting':'非會議時間','Scrum Event':'Scrum 事件','Discovery':'探索',
+  'Support':'支援','Department Autonomy':'部門自主','Meet Customer':'接觸客戶',
+  'Co-work':'協作','Sharing':'分享'
+};
+const MTG_CATS = ['Scrum Event','Discovery','Support','Department Autonomy','Meet Customer','Co-work','Sharing'];
+const ALL_CATS  = ['Non-meeting',...MTG_CATS];
+const GC_COLORS = {gc_ok:'#10b981', g_ok:'#f59e0b', gc_fail:'#ef4444', interrupted:'#374151'};
+const WASTE_COLORS = {'干擾 Interruptions':'#374151','Extra Process 額外流程':'#f59e0b','Task Switching 任務切換':'#8b5cf6','Rework Risk 返工風險':'#f97316'};
+const leg = {position:'bottom',labels:{font:{size:10},padding:7}};
+const chartStore = {};
+
+// ════════════════════════════════════════════════════════════
+// CSV PARSER
+// ════════════════════════════════════════════════════════════
+function arraysToObjects(rows) {
+  if (!rows || rows.length < 2) return [];
+  const headers = rows[0].map(h => String(h).trim());
+  return rows.slice(1).map(row => {
+    const obj = {};
+    headers.forEach((h,i) => obj[h] = String(row[i]||'').trim());
+    return obj;
+  }).filter(r => Object.values(r).some(v => v !== ''));
+}
+
+function parseDate(s) {
+  if (!s) return null;
+  // dd/mm/yyyy or yyyy-mm-dd
+  const m1 = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m1) return new Date(+m1[3], +m1[2]-1, +m1[1]);
+  const m2 = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (m2) return new Date(+m2[1], +m2[2]-1, +m2[3]);
+  return null;
+}
+
+function excelPct(arr, p) {
+  const s = [...arr].sort((a,b)=>a-b);
+  const i = p/100 * (s.length-1);
+  const lo = Math.floor(i), hi = Math.ceil(i);
+  return lo===hi ? s[lo] : s[lo] + (i-lo)*(s[hi]-s[lo]);
+}
+
+// ════════════════════════════════════════════════════════════
+// FETCH ALL SHEETS
+// ════════════════════════════════════════════════════════════
+
+async function loadAll() {
+  const overlay = document.getElementById('loadingOverlay');
+  const errDiv  = document.getElementById('loadErr');
+  try {
+    // Apps Script CORS workaround: fetch with mode no-cors won't work,
+    // so we use HtmlService on the Apps Script side which sets CORS headers.
+    // The response Content-Type will be text/html but body is JSON.
+    const res = await fetch(APPS_SCRIPT_URL, {
+      method: 'GET',
+      redirect: 'follow',
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const text = await res.text();
+    // Strip any HTML wrapper if present (HtmlService may add <!DOCTYPE...>)
+    const jsonStart = text.indexOf('{');
+    const jsonEnd   = text.lastIndexOf('}');
+    if (jsonStart < 0 || jsonEnd < 0) {
+      throw new Error('回傳格式錯誤 / Unexpected response format: ' + text.substring(0,300));
+    }
+    let raw;
+    try { raw = JSON.parse(text.substring(jsonStart, jsonEnd + 1)); }
+    catch(pe) { throw new Error('JSON 解析失敗 / JSON parse error: ' + pe.message); }
+    const pbi        = arraysToObjects(raw['PBI']                   || []);
+    const designSbi  = arraysToObjects(raw['Design SBI']            || []);
+    const leadTime   = arraysToObjects(raw['LeadTime']              || []);
+    const sprintGoal = arraysToObjects(raw['SprintGoal']            || []);
+    const designGoal = arraysToObjects(raw['Designer SprintGoal']   || []);
+    const meetings   = arraysToObjects(raw['會議時間紀錄簿']           || []);
+    overlay.style.display = 'none';
+    document.getElementById('appContent').style.display = 'block';
+    buildDashboard({pbi, designSbi, leadTime, sprintGoal, designGoal, meetings});
+  } catch(e) {
+    errDiv.style.display = 'block';
+    const testLink = '<br><a href="' + APPS_SCRIPT_URL + '" target="_blank" style="color:#1e40af;font-weight:600">🔗 直接在瀏覽器測試 Apps Script URL（應該回傳 JSON）↗</a>';
+    errDiv.innerHTML = '<strong>⚠️ 無法載入資料 / Failed to load data</strong><br>' + e.message + '<br><br>'
+      + '可能原因：<br>1. Apps Script 尚未部署或授權 / Not deployed or authorized<br>'
+      + '2. 存取設定需要為「Anyone」 / Access must be Anyone<br>'
+      + '3. CORS：確認 Apps Script 回傳 JSON Content-Type<br><br>' + testLink;
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// MAIN BUILD FUNCTION
+// ════════════════════════════════════════════════════════════
+function buildDashboard({pbi, designSbi, leadTime, sprintGoal, designGoal, meetings}) {
+
+  // ── Detect column indices from PBI headers ──────────────
+  const pbiH = pbi.length ? Object.keys(pbi[0]) : [];
+  const colIdx = (keywords) => {
+    const kw = keywords.map(k=>k.toLowerCase());
+    return pbiH.find(h => kw.some(k => h.toLowerCase().includes(k))) || null;
+  };
+  const sprintCol  = colIdx(['sprint']);
+  const statusCol  = colIdx(['status','狀態','done']);
+  const typeCol    = colIdx(['type','類型','category']);
+  const wCol       = colIdx(['lead time','lead_time','w','天數']) || 'W';
+  const kCol       = colIdx(['completion','完成日','k','done date']) || 'K';
+  const deliverCol = colIdx(['deliverable','交付','summary','title','description','name','標題']);
+
+  // ── PBI rows (data starts row 3 = index 0 in parsed array since header is row 1) ──
+  // Rows 0-69 = 2025 (70 items), rows 70+ = 2026
+  const pbi2025 = pbi.slice(0, 70);
+  const pbi2026 = pbi.slice(70);
+
+  // ── Sprint list from PBI ────────────────────────────────
+  const sprintSet = new Set();
+  pbi.forEach(r => { if(r[sprintCol]) sprintSet.add(r[sprintCol]); });
+  const sprints = [...sprintSet].sort();
+
+  // Assign quarters
+  const sprintQ = {};
+  sprints.forEach((sp,i) => {
+    sprintQ[sp] = i < 5 ? 'Q1' : (i < 9 ? 'Q2' : 'Q3');
+  });
+
+  // ── Throughput from PBI ─────────────────────────────────
+  const thruMap = {};
+  const deliverMap = {};
+  sprints.forEach(sp => { thruMap[sp]=0; deliverMap[sp]=[]; });
+  pbi.forEach(r => {
+    const sp = r[sprintCol]; if(!sp) return;
+    const st = (r[statusCol]||'').toLowerCase();
+    if(st === 'done' || st === '完成' || st === 'closed') {
+      thruMap[sp] = (thruMap[sp]||0) + 1;
+      if(deliverCol && r[deliverCol]) deliverMap[sp].push(r[deliverCol]);
+    }
+  });
+  const throughput = sprints.map(sp => thruMap[sp]||0);
+  const rolling = throughput.map((_,i) => {
+    const w = throughput.slice(Math.max(0,i-1), i+2);
+    return Math.round(w.reduce((a,b)=>a+b,0)/w.length*10)/10;
+  });
+
+  // ── Lead Time from PBI ──────────────────────────────────
+  function getLtItems(rows) {
+    return rows.map(r => {
+      const lt = parseFloat(r[wCol]);
+      const kd = parseDate(r[kCol]);
+      const yr = kd ? kd.getFullYear() : null;
+      const sp = r[sprintCol];
+      const q  = sp ? sprintQ[sp] : null;
+      return isNaN(lt) ? null : {lt: Math.round(lt), yr, q, sp};
+    }).filter(Boolean);
+  }
+  const ltItems2026 = getLtItems(pbi2026);
+  const ltItems2025 = getLtItems(pbi2025);
+
+  function computeLt(items, q=null) {
+    const f = q ? items.filter(x=>x.q===q) : items;
+    const vals = f.map(x=>x.lt);
+    if(!vals.length) return null;
+    const cnt = {};
+    vals.forEach(v => cnt[v]=(cnt[v]||0)+1);
+    const maxD = Math.max(...vals);
+    const days = Array.from({length:maxD}, (_,i)=>i+1);
+    const freq = days.map(d=>cnt[d]||0);
+    const p50 = Math.round(excelPct(vals,50));
+    const p85 = Math.round(excelPct(vals,85));
+    const p98 = Math.round(excelPct(vals,98));
+    const ratio = p50>0 ? (p98/p50).toFixed(2) : '—';
+    return {p50,p85,p98,n:vals.length,days,freq,ratio};
+  }
+
+  const lt26 = {all:computeLt(ltItems2026), Q1:computeLt(ltItems2026,'Q1'), Q2:computeLt(ltItems2026,'Q2'), Q3:computeLt(ltItems2026,'Q3')};
+  const lt25 = {all:computeLt(ltItems2025), Q1:computeLt(ltItems2025,'Q1'), Q2:computeLt(ltItems2025,'Q2'), Q3:computeLt(ltItems2025,'Q3')};
+
+  // ── Meeting time (會議時間紀錄簿) ───────────────────────
+  const mtgHdrs = meetings.length ? Object.keys(meetings[0]) : [];
+  const mSprintCol  = mtgHdrs.find(h=>h.toLowerCase().includes('sprint'))||mtgHdrs[1];
+  const mTypeCol    = mtgHdrs.find(h=>h.toLowerCase().includes('type')||h.toLowerCase().includes('類型'))||mtgHdrs[3];
+  const mHrsCol     = mtgHdrs.find(h=>h.toLowerCase().includes('hour')||h.toLowerCase().includes('時')||h.toLowerCase().includes('hr'))||mtgHdrs[5];
+  const mDateCol    = mtgHdrs.find(h=>h.toLowerCase().includes('date')||h.toLowerCase().includes('日期'))||mtgHdrs[0];
+
+  // Category keyword map
+  const catKeywords = {
+    'Scrum Event':        ['planning','review','retro','retrospective','daily','standup','refinement','grooming','scrum','ceremony'],
+    'Discovery':          ['discovery','pbr','backlog refine','design review','research','spike'],
+    'Support':            ['support','bug','triage','unplanned','hotfix'],
+    'Department Autonomy':['department','dept','all-hands','okr','autonomous','自主','部門'],
+    'Meet Customer':      ['customer','client','user interview','demo','meet cust'],
+    'Co-work':            ['co-work','cowork','pair','cross','collaboration'],
+    'Sharing':            ['sharing','share','guild','tech talk','知識'],
+  };
+  function categorize(name) {
+    const n = (name||'').toLowerCase();
+    for(const [cat, kws] of Object.entries(catKeywords))
+      if(kws.some(k => n.includes(k))) return cat;
+    return 'Scrum Event'; // default
+  }
+
+  // Group meetings by sprint
+  const mtgBySprint = {};
+  sprints.forEach(sp => {
+    mtgBySprint[sp] = {};
+    MTG_CATS.forEach(c => mtgBySprint[sp][c] = 0);
+  });
+  meetings.forEach(r => {
+    const sp = r[mSprintCol];
+    if(!sp || !mtgBySprint[sp]) return;
+    const hrs = parseFloat(r[mHrsCol])||0;
+    const cat = categorize(r[mTypeCol]);
+    if(mtgBySprint[sp][cat] !== undefined) mtgBySprint[sp][cat] += hrs;
+  });
+
+  // ── Sprint capacity from meetings sheet ─────────────────
+  // total_hours per sprint: sum all meeting hours + estimate non-meeting
+  // We'll derive total capacity from workdays if available, else use 40hr default
+  const sprintWorkdays = {};
+  meetings.forEach(r => {
+    const sp = r[mSprintCol]; if(!sp) return;
+    // look for workdays column
+    const wdCol = mtgHdrs.find(h=>h.toLowerCase().includes('工作日')||h.toLowerCase().includes('workday'));
+    if(wdCol && r[wdCol]) sprintWorkdays[sp] = parseInt(r[wdCol])||0;
+  });
+
+  // Build weekly data for charts
+  const weeklyData = sprints.map(sp => {
+    const mtg = mtgBySprint[sp]||{};
+    const mtgTotal = MTG_CATS.reduce((s,c)=>s+(mtg[c]||0), 0);
+    const workdays = sprintWorkdays[sp] || 5;
+    const totalHrs = workdays * 8;
+    const nonMtg = Math.max(0, totalHrs - mtgTotal);
+    return {
+      week: sp,
+      total_hours: totalHrs,
+      'Non-meeting': Math.round(nonMtg*10)/10,
+      ...Object.fromEntries(MTG_CATS.map(c=>[c, Math.round((mtg[c]||0)*10)/10]))
+    };
+  });
+
+  // ── Focus metrics ────────────────────────────────────────
+  const metrics = weeklyData.map(wd => {
+    const th = wd.total_hours;
+    const focusHrs = wd['Non-meeting'];
+    const focusPct = Math.round(focusHrs/th*1000)/10;
+    const mtgTotal = MTG_CATS.reduce((s,c)=>s+(wd[c]||0),0);
+    const mtgPct   = Math.round(mtgTotal/th*1000)/10;
+    const discPct  = Math.round(wd['Discovery']/th*1000)/10;
+    const activeCats = MTG_CATS.filter(c=>wd[c]>0).length;
+    const frag = (activeCats>=4&&focusPct<55)?'HIGH':(mtgPct>25?'MEDIUM':'LOW');
+    const focusSt = focusPct>=78?'green':(focusPct>=65?'amber':'red');
+    const scrumOT = Math.round(Math.max(0,wd['Scrum Event']-4.5)*60);
+    return {...wd, focusPct, focusHrs, mtgPct, discPct, activeCats, frag, focusSt, scrumOT};
+  });
+
+  const avgFocus = Math.round(metrics.reduce((s,m)=>s+m.focusPct,0)/metrics.length*10)/10;
+  const below78  = metrics.filter(m=>m.focusPct<78).length;
+  const critCount= metrics.filter(m=>m.focusPct<65).length;
+  const n_above_78 = metrics.length - below78;
+  const n_above_65 = metrics.filter(m=>m.focusPct>=65).length;
+  const avgMtg   = Math.round(metrics.reduce((s,m)=>s+m.mtgPct,0)/metrics.length*10)/10;
+  const avgScrum = Math.round(metrics.reduce((s,m)=>s+m.wd?.['Scrum Event']??m['Scrum Event'],0)/metrics.length*100)/100;
+  const avgPbrOT = Math.round(metrics.reduce((s,m)=>s+m.scrumOT,0)/metrics.length);
+  const avgDisc  = Math.round(metrics.reduce((s,m)=>s+m.discPct,0)/metrics.length*10)/10;
+
+  // ── SprintGoal ────────────────────────────────────────────
+  const sgHdrs = sprintGoal.length ? Object.keys(sprintGoal[0]) : [];
+  const sgSprintCol = sgHdrs.find(h=>h.toLowerCase().includes('sprint'))||sgHdrs[0];
+  const sgGoalCol   = sgHdrs.find(h=>h.toLowerCase().includes('goal')&&h.toLowerCase().includes('succeed'))||sgHdrs[1];
+  const sgCommitCol = sgHdrs.find(h=>h.toLowerCase().includes('commit'))||sgHdrs[2];
+  const sgStopCol   = sgHdrs.find(h=>h.toLowerCase().includes('stop'))||sgHdrs[3];
+
+  const goalMap = {};
+  sprintGoal.forEach(r => {
+    const sp = r[sgSprintCol]; if(!sp) return;
+    const interrupted = (r[sgStopCol]||'').toUpperCase()==='Y';
+    const goalOk   = (r[sgGoalCol]||'').toUpperCase()==='Y';
+    const commitOk = (r[sgCommitCol]||'').toUpperCase()==='Y';
+    goalMap[sp] = {interrupted, goalOk, commitOk};
+  });
+
+  const sprintMeta = sprints.map(sp => {
+    const g = goalMap[sp]||{};
+    const state = g.interrupted?'interrupted':(g.goalOk&&g.commitOk?'gc_ok':(!g.goalOk&&!g.commitOk?'gc_fail':'g_ok'));
+    return {...g, state};
+  });
+
+  const active = sprintMeta.filter(m=>!m.interrupted);
+  const goalRate   = active.length ? Math.round(active.filter(m=>m.goalOk).length/active.length*100) : 0;
+  const commitRate = active.length ? Math.round(active.filter(m=>m.commitOk).length/active.length*100) : 0;
+  const goalDone   = active.filter(m=>m.goalOk).length;
+  const commitDone = active.filter(m=>m.commitOk).length;
+
+  // avg pax from design goal sheet
+  const dgHdrs = designGoal.length ? Object.keys(designGoal[0]) : [];
+  const dgPaxCol = dgHdrs.find(h=>h.toLowerCase().includes('pax')||h.toLowerCase().includes('人數')||h.toLowerCase().includes('headcount'));
+  const dgSprintCol = dgHdrs.find(h=>h.toLowerCase().includes('sprint'))||dgHdrs[0];
+  const avgPaxMap = {};
+  designGoal.forEach(r => {
+    const sp=r[dgSprintCol]; if(!sp) return;
+    const p=parseFloat(r[dgPaxCol])||0;
+    avgPaxMap[sp]=p;
+  });
+  const avgPax = sprints.map(sp => avgPaxMap[sp]||0);
+
+  // ── Design SBI lead time ─────────────────────────────────
+  const dsHdrs = designSbi.length ? Object.keys(designSbi[0]) : [];
+  const dsLtCol = dsHdrs[20]||'U'; // col U = index 20
+  const dsSprintCol = dsHdrs.find(h=>h.toLowerCase().includes('sprint'))||dsHdrs[0];
+  const dsFeatureCol= dsHdrs.find(h=>h.toLowerCase().includes('feature')||h.toLowerCase().includes('title')||h.toLowerCase().includes('name'))||dsHdrs[1];
+  const dltRows = designSbi.filter(r=>r[dsLtCol]&&!isNaN(parseFloat(r[dsLtCol]))).map(r=>({
+    sprint: r[dsSprintCol]||'—',
+    feature: r[dsFeatureCol]||'—',
+    lt: Math.round(parseFloat(r[dsLtCol])),
+    status: '完成 Done',
+  }));
+  const dltAvg = dltRows.length ? Math.round(dltRows.reduce((s,r)=>s+r.lt,0)/dltRows.length*10)/10 : 0;
+
+  // ── Waste ────────────────────────────────────────────────
+  const wasteByWeek = metrics.map(m => ({
+    '干擾 Interruptions':  m['Support'],
+    'Extra Process 額外流程': (m['Department Autonomy']||0)+Math.max(0,(m['Scrum Event']||0)-6)+Math.max(0,(m['Sharing']||0)-1),
+    'Task Switching 任務切換': (m['Meet Customer']||0)+Math.max(0,(m['Co-work']||0)-1.5),
+    'Rework Risk 返工風險':  Math.max(0, m.total_hours*0.10 - (m['Discovery']||0)),
+  }));
+
+  // ── Filter data for meetings/breakdown ───────────────────
+  const last4   = weeklyData.slice(-4);
+  const qGroups = {last4, Q1:[], Q2:[], Q3:[]};
+  weeklyData.forEach(wd => qGroups[sprintQ[wd.week]]?.push(wd));
+  Object.values(qGroups).forEach(wds => wds.forEach(wd => {
+    wd.focus_pct = Math.round(wd['Non-meeting']/wd.total_hours*1000)/10;
+  }));
+
+  // ════════════════════════════════════════════════════
+  // UPDATE HEADER
+  // ════════════════════════════════════════════════════
+  const lastSprint = sprints[sprints.length-1]||'';
+  const now = new Date().toLocaleString('zh-TW',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+  document.getElementById('headerSub').innerHTML =
+    `${sprints[0]}–${lastSprint} · ${sprints.length} sprints · Focus ≥78% · 更新 ${now} 🟢 Live`;
+
+  // ════════════════════════════════════════════════════
+  // STAT CARDS
+  // ════════════════════════════════════════════════════
+  const fcol = avgFocus>=78?'green':(avgFocus>=65?'orange':'red');
+  const gcol = goalRate>=70?'green':(goalRate>=50?'orange':'red');
+  const ccol = commitRate>=70?'green':(commitRate>=50?'orange':'red');
+  set('s-focus', avgFocus+'%', fcol);
+  set('s-below', `${below78}/${metrics.length}`, below78>metrics.length/2?'red':'orange');
+  set('s-crit',  critCount, critCount>0?'red':'green');
+  set('s-pbr',   avgPbrOT+'min', avgPbrOT>15?'red':'orange');
+  set('s-goal',  goalRate+'%', gcol);
+  set('s-commit',commitRate+'%', ccol);
+  document.getElementById('s-goal-n').textContent   = `${goalDone}/${active.length} sprints`;
+  document.getElementById('s-commit-n').textContent = `${commitDone}/${active.length} sprints`;
+
+  function set(id, val, cls='') {
+    const el = document.getElementById(id); if(!el) return;
+    el.textContent = val;
+    el.className = 'sv'+(cls?' '+cls:'');
+  }
+
+  // ════════════════════════════════════════════════════
+  // FOCUS THRESHOLD BLOCK
+  // ════════════════════════════════════════════════════
+  document.getElementById('ft-78').textContent = `${n_above_78}/${metrics.length}`;
+  document.getElementById('ft-78-pct').textContent = `${Math.round(n_above_78/metrics.length*100)}% of sprints · On target`;
+  document.getElementById('ft-65').textContent = `${n_above_65}/${metrics.length}`;
+  document.getElementById('ft-65-pct').textContent = `${Math.round(n_above_65/metrics.length*100)}% of sprints · Acceptable`;
+  document.getElementById('ft-crit').textContent = critCount;
+  document.getElementById('ft-crit-sub').textContent = critCount>0 ? '需立即關注 Action needed' : '無危急週次 None';
+
+  // ════════════════════════════════════════════════════
+  // FOCUS BARS
+  // ════════════════════════════════════════════════════
+  const barsHtml = metrics.map(m => {
+    const col = m.focusSt==='green'?'#10b981':(m.focusSt==='amber'?'#f59e0b':'#ef4444');
+    const icon= m.focusSt==='green'?'✅':(m.focusSt==='amber'?'⚠️':'🔴');
+    return `<div class="focus-row">
+      <div class="fl">${m.week}<span class="fc">${m.total_hours}hr</span></div>
+      <div class="fw"><div class="fb2" style="width:${Math.min(m.focusPct,100)}%;background:${col}"></div><div class="fr"></div></div>
+      <div class="fv" style="color:${col}">${icon} ${m.focusPct}%</div>
+    </div>`;
+  }).join('');
+  document.getElementById('focusBars').innerHTML = barsHtml;
+  document.getElementById('focusSummary').textContent =
+    `✅ ${metrics.length-below78}/${metrics.length} on target (≥78%) · ⚠️ ${below78} below 78% · 🔴 ${critCount} critical (<65%)`;
+
+  // ════════════════════════════════════════════════════
+  // FOCUS HISTOGRAM
+  // ════════════════════════════════════════════════════
+  const hBins=[55,60,65,70,75,80,85,90,95,100];
+  const focusPcts = metrics.map(m=>m.focusPct);
+  const hCounts = hBins.map(b=>focusPcts.filter(x=>x>=b&&x<b+5).length);
+  const hColors = hBins.map(b=>b<65?'#ef4444':(b<78?'#f59e0b':'#10b981'));
+  new Chart(document.getElementById('focusHistChart'),{
+    type:'bar',
+    data:{labels:hBins.map(b=>`${b}–${b+4}%`),datasets:[{data:hCounts,backgroundColor:hColors,borderRadius:3}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{grid:{display:false},ticks:{font:{size:8}}},y:{grid:{color:G},ticks:{font:{size:8}}}}}
+  });
+
+  // ════════════════════════════════════════════════════
+  // LEAD TIME UI
+  // ════════════════════════════════════════════════════
+  let ltFreqChart = null;
+  const allDays = Array.from({length:Math.max(...(lt26.all?.days||[1]),...(lt25.all?.days||[1]))}, (_,i)=>i+1);
+  const cnt26All = {}; ltItems2026.forEach(x=>cnt26All[x.lt]=(cnt26All[x.lt]||0)+1);
+  const cnt25All = {}; ltItems2025.forEach(x=>cnt25All[x.lt]=(cnt25All[x.lt]||0)+1);
+  const freq26 = allDays.map(d=>cnt26All[d]||0);
+  const freq25 = allDays.map(d=>cnt25All[d]||0);
+
+  function updateLtBoxes(yr, stat) {
+    if(!stat) return;
+    document.getElementById(`lt-p50-${yr}`).textContent = stat.p50;
+    document.getElementById(`lt-p85-${yr}`).textContent = stat.p85;
+    document.getElementById(`lt-p98-${yr}`).textContent = stat.p98;
+    document.getElementById(`lt-n-${yr}`).textContent = `n=${stat.n}`;
+    document.getElementById(`lt-ratio-${yr}`).textContent = stat.ratio;
+  }
+  window.setLtFilter = function(yr, key, el) {
+    document.querySelectorAll(`.lt-btn-${yr}`).forEach(b=>b.classList.remove('active'));
+    el.classList.add('active');
+    const data = yr==='2026' ? lt26[key] : lt25[key];
+    updateLtBoxes(yr, data);
+  };
+  updateLtBoxes('2026', lt26.all);
+  updateLtBoxes('2025', lt25.all);
+
+  ltFreqChart = new Chart(document.getElementById('ltFreqChart'),{
+    type:'bar',
+    data:{labels:allDays, datasets:[
+      {label:`2026 (n=${lt26.all?.n||0})`, data:freq26, backgroundColor:'#3b82f688', borderColor:'#3b82f6', borderWidth:1, borderRadius:2},
+      {label:`2025 (n=${lt25.all?.n||0})`, data:freq25, backgroundColor:'#f59e0b88', borderColor:'#f59e0b', borderWidth:1, borderRadius:2},
+    ]},
+    options:{responsive:true,plugins:{legend:{position:'bottom',labels:{font:{size:10},padding:7}}},
+      scales:{x:{title:{display:true,text:'Days 天數',font:{size:9}},grid:{display:false},ticks:{font:{size:8}}},
+              y:{title:{display:true,text:'# items',font:{size:9}},grid:{color:G},ticks:{font:{size:8}}}}}
+  });
+
+  // Quarterly table
+  const qBody = document.getElementById('ltQRows');
+  ['Q1','Q2','Q3'].forEach(q => {
+    const d26=lt26[q], d25=lt25[q];
+    const fmt=s=>s?`p50=${s.p50}d · p85=${s.p85}d · p98=${s.p98}d (n=${s.n})`:'—';
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td><strong>${q}</strong></td><td style="font-size:.8rem">${fmt(d26)}</td><td style="font-size:.8rem">${fmt(d25)}</td>`;
+    qBody.appendChild(tr);
+  });
+
+  // Design SBI table
+  const dltBody = document.getElementById('dltTableBody');
+  document.getElementById('dlt-avg-line').textContent = `${dltRows.length} items · avg 平均 ${dltAvg}d`;
+  if(dltRows.length) {
+    dltRows.forEach(r => {
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td>${r.sprint}</td><td>${r.feature}</td><td style="font-weight:700;color:#2563eb">${r.lt}d</td><td style="color:#10b981">${r.status}</td>`;
+      dltBody.appendChild(tr);
+    });
+  } else {
+    dltBody.innerHTML='<tr><td colspan="4" style="color:var(--sub);font-size:.82rem;padding:12px">無 Design Lead Time 資料 / No design lead time data found in U column</td></tr>';
+  }
+
+  // ════════════════════════════════════════════════════
+  // THROUGHPUT
+  // ════════════════════════════════════════════════════
+  const thruColors = throughput.map(t=>t===0?'#ef4444':'#3b82f6');
+  new Chart(document.getElementById('throughputChart'),{
+    type:'line',
+    data:{labels:sprints, datasets:[
+      {label:'Done items 完成',data:throughput,borderColor:'#3b82f6',backgroundColor:'#3b82f622',fill:true,tension:.3,pointRadius:5,pointBackgroundColor:thruColors,pointBorderColor:thruColors},
+      {label:'3-Sprint avg 滾動平均',data:rolling,borderColor:'#9ca3af',borderDash:[5,4],pointRadius:0,borderWidth:1.5,tension:.3}
+    ]},
+    options:{responsive:true,plugins:{legend:{position:'bottom'}},scales:{x:{grid:{display:false},ticks:{font:{size:9}}},y:{min:0,grid:{color:G}}}}
+  });
+
+  const thruBody = document.getElementById('thruTableBody');
+  sprints.forEach(sp => {
+    const tr=document.createElement('tr');
+    const cnt=thruMap[sp]||0;
+    const style=cnt===0?'font-weight:700;color:#dc2626':'';
+    tr.innerHTML=`<td>${sp}</td><td>—</td><td style="${style}">${cnt}</td><td style="font-size:.78rem">${(deliverMap[sp]||[]).slice(0,2).join(', ')||'—'}</td>`;
+    thruBody.appendChild(tr);
+  });
+
+  // ════════════════════════════════════════════════════
+  // CHARTS (Overview stacked, Goal, Focus trend, Waste, Scrum, Discovery)
+  // ════════════════════════════════════════════════════
+  const xl = sprints;
+  const jStacked = ALL_CATS.map(c=>({label:`${CAT_ZH[c]} / ${c}`,data:weeklyData.map(w=>w[c]),backgroundColor:CAT_COLORS[c]}));
+  new Chart(document.getElementById('stackedChart'),{type:'bar',data:{labels:xl,datasets:jStacked},options:{responsive:true,plugins:{legend:leg},scales:{x:{stacked:true,grid:{display:false},ticks:{font:{size:9}}},y:{stacked:true,ticks:{callback:v=>v+'hr'},grid:{color:G}}}}});
+
+  const barColors = sprintMeta.map(m=>GC_COLORS[m.state]);
+  const scrumHrs  = weeklyData.map(w=>w['Scrum Event']);
+  new Chart(document.getElementById('goalBarChart'),{type:'bar',data:{labels:xl,datasets:[
+    {label:'Scrum Event Hours 時數',data:scrumHrs,backgroundColor:barColors,borderRadius:4,yAxisID:'y'},
+    {label:'Avg Daily Participants 每日平均人數',data:avgPax,type:'line',borderColor:'#3b82f6',backgroundColor:'transparent',pointBackgroundColor:'#3b82f6',pointBorderColor:'#fff',pointBorderWidth:2,pointRadius:4,tension:.3,yAxisID:'y2'}
+  ]},options:{responsive:true,plugins:{legend:{position:'top',labels:{font:{size:10},padding:8}}},scales:{x:{grid:{display:false},ticks:{font:{size:9}}},y:{grid:{color:G},ticks:{callback:v=>v+'h'}},y2:{position:'right',grid:{display:false},ticks:{callback:v=>v+'人',font:{size:9}},min:0,max:10}}}});
+
+  const focusPctArr = metrics.map(m=>m.focusPct);
+  const focusColors = metrics.map(m=>m.focusSt==='green'?'#10b981':(m.focusSt==='amber'?'#f59e0b':'#ef4444'));
+  const arr78=sprints.map(()=>78), arr65=sprints.map(()=>65);
+  new Chart(document.getElementById('focusTrendChart'),{type:'line',data:{labels:xl,datasets:[
+    {label:'Focus % 專注時間',data:focusPctArr,borderColor:'#3b82f6',backgroundColor:'#3b82f622',fill:true,tension:.3,pointRadius:4,pointBackgroundColor:focusColors},
+    {label:'78% benchmark',data:arr78,borderColor:'#1d4ed8',borderDash:[6,4],pointRadius:0,borderWidth:2},
+    {label:'65% floor',data:arr65,borderColor:'#ef4444',borderDash:[3,3],pointRadius:0,borderWidth:1.5}
+  ]},options:{responsive:true,plugins:{legend:{position:'bottom'}},scales:{x:{grid:{display:false},ticks:{font:{size:9}}},y:{min:40,max:100,ticks:{callback:v=>v+'%'},grid:{color:G}}}}});
+
+  // Waste
+  const wasteCats = Object.keys(WASTE_COLORS);
+  const wasteDs   = wasteCats.map(wt=>({label:wt,data:wasteByWeek.map(w=>Math.round((w[wt]||0)*100)/100),backgroundColor:WASTE_COLORS[wt],borderRadius:3}));
+  new Chart(document.getElementById('wasteStackChart'),{type:'bar',data:{labels:xl,datasets:wasteDs},options:{responsive:true,plugins:{legend:leg},scales:{x:{stacked:true,grid:{display:false},ticks:{font:{size:9}}},y:{stacked:true,grid:{color:G}}}}});
+  const wasteTotals = wasteCats.map(wt=>Math.round(wasteByWeek.reduce((s,w)=>s+(w[wt]||0),0)*10)/10);
+  new Chart(document.getElementById('wasteDonutChart'),{type:'doughnut',data:{labels:wasteCats,datasets:[{data:wasteTotals,backgroundColor:Object.values(WASTE_COLORS),borderWidth:2,borderColor:'#fff'}]},options:{responsive:true,plugins:{legend:leg}}});
+
+  // Scrum
+  const timebox = sprints.map(()=>4.5);
+  new Chart(document.getElementById('scrumChart'),{type:'bar',data:{labels:xl,datasets:[{label:'Scrum Events (hr)',data:scrumHrs,backgroundColor:barColors,borderRadius:4},{label:'Timebox 4.5h 時間箱',data:timebox,type:'line',borderColor:'#dc2626',borderDash:[6,4],pointRadius:0,borderWidth:2}]},options:{responsive:true,plugins:{legend:{position:'bottom'}},scales:{x:{grid:{display:false},ticks:{font:{size:9}}},y:{grid:{color:G}}}}});
+  const discPcts = metrics.map(m=>m.discPct);
+  const disc10   = sprints.map(()=>10);
+  new Chart(document.getElementById('discoveryChart'),{type:'line',data:{labels:xl,datasets:[{label:'Discovery % (PBR+Design Review)',data:discPcts,borderColor:'#0d9488',backgroundColor:'#0d948822',fill:true,tension:.3,pointRadius:4},{label:'10% target 目標',data:disc10,borderColor:'#fbbf24',borderDash:[6,4],pointRadius:0,borderWidth:2}]},options:{responsive:true,plugins:{legend:{position:'bottom'}},scales:{x:{grid:{display:false},ticks:{font:{size:9}}},y:{max:25,ticks:{callback:v=>v+'%'},grid:{color:G}}}}});
+
+  // ════════════════════════════════════════════════════
+  // GOAL TILES
+  // ════════════════════════════════════════════════════
+  const tilesEl = document.getElementById('goalTiles');
+  sprintMeta.forEach((m,i) => {
+    const bg=GC_COLORS[m.state];
+    const sym=m.interrupted?'■':(m.goalOk&&m.commitOk?'✓✓':(!m.goalOk&&!m.commitOk?'✗✗':'✓✗'));
+    const div=document.createElement('div');
+    div.className='goal-tile';
+    div.style.background=bg;
+    div.innerHTML=`<span style="font-size:.72rem;opacity:.8">${sprints[i]}</span><br><span style="font-size:.9rem;font-weight:700">${sym}</span>`;
+    tilesEl.appendChild(div);
+  });
+  // Milestone dates (start/mid/end)
+  const msWrap = document.getElementById('tileMsWrap');
+  [[0,'start'],[Math.floor(sprints.length/2),'mid'],[sprints.length-1,'end']].forEach(([idx])=>{
+    const d=document.createElement('div');d.className='tm';
+    d.style.left=`${idx/(sprints.length-1)*100}%`;
+    d.textContent=sprints[idx]||'';
+    msWrap.appendChild(d);
+  });
+
+  // ════════════════════════════════════════════════════
+  // MEETINGS & BREAKDOWN (filterable)
+  // ════════════════════════════════════════════════════
+  window.setMtgFilter = function(key,el){
+    document.querySelectorAll('.mtg-btn').forEach(b=>b.classList.remove('active'));
+    el.classList.add('active');
+    buildMtgChart(qGroups[key]);
+  };
+  window.setBdFilter = function(key,el){
+    document.querySelectorAll('.bd-btn').forEach(b=>b.classList.remove('active'));
+    el.classList.add('active');
+    buildBdCharts(qGroups[key]);
+  };
+
+  function buildMtgChart(wds) {
+    if(chartStore.mtg) chartStore.mtg.destroy();
+    const labels=wds.map(w=>w.week);
+    const totalMtg=wds.map(w=>MTG_CATS.reduce((s,c)=>s+(w[c]||0),0));
+    const pct=wds.map((w,i)=>Math.round(totalMtg[i]/w.total_hours*1000)/10);
+    chartStore.mtg=new Chart(document.getElementById('mtgComboChart'),{type:'bar',data:{labels,datasets:[
+      ...MTG_CATS.map(c=>({label:`${CAT_ZH[c]} / ${c}`,data:wds.map(w=>w[c]),backgroundColor:CAT_COLORS[c],yAxisID:'y',stack:'hrs'})),
+      {label:'Meeting Load % 會議負荷',data:pct,type:'line',borderColor:'#ef4444',backgroundColor:'transparent',pointRadius:3,tension:.3,yAxisID:'y2'},
+      {label:'22% Threshold 警戒',data:wds.map(()=>22),type:'line',borderColor:'#fbbf24',borderDash:[6,4],pointRadius:0,borderWidth:1.5,yAxisID:'y2'}
+    ]},options:{responsive:true,plugins:{legend:{position:'bottom',labels:{font:{size:10},padding:7}}},scales:{x:{stacked:true,grid:{display:false},ticks:{font:{size:9}}},y:{stacked:true,grid:{color:G},ticks:{callback:v=>v+'hr'}},y2:{position:'right',grid:{display:false},ticks:{callback:v=>v+'%',font:{size:9}},min:0,max:60}}}});
+  }
+
+  function buildBdCharts(wds) {
+    if(chartStore.bdFull) chartStore.bdFull.destroy();
+    if(chartStore.bdMtg)  chartStore.bdMtg.destroy();
+    const labels=wds.map(w=>w.week);
+    chartStore.bdFull=new Chart(document.getElementById('bdFullChart'),{type:'bar',data:{labels,datasets:ALL_CATS.map(c=>({label:`${CAT_ZH[c]} / ${c}`,data:wds.map(w=>w[c]),backgroundColor:CAT_COLORS[c]}))},options:{responsive:true,plugins:{legend:leg},scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,ticks:{callback:v=>v+'hr'},grid:{color:G}}}}});
+    const fpct=wds.map(w=>w.focus_pct||0);
+    chartStore.bdMtg=new Chart(document.getElementById('bdMtgChart'),{type:'bar',data:{labels,datasets:[
+      ...MTG_CATS.map(c=>({label:`${CAT_ZH[c]} / ${c}`,data:wds.map(w=>w[c]),backgroundColor:CAT_COLORS[c],stack:'hrs',yAxisID:'y'})),
+      {label:'Focus % 專注時間',data:fpct,type:'line',borderColor:'#3b82f6',backgroundColor:'transparent',pointRadius:3,tension:.3,yAxisID:'y2'},
+      {label:'78% baseline',data:wds.map(()=>78),type:'line',borderColor:'#1d4ed8',borderDash:[6,4],pointRadius:0,borderWidth:2,yAxisID:'y2'},
+      {label:'65% floor',data:wds.map(()=>65),type:'line',borderColor:'#ef4444',borderDash:[3,3],pointRadius:0,borderWidth:1.5,yAxisID:'y2'}
+    ]},options:{responsive:true,plugins:{legend:leg},scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,grid:{color:G},ticks:{callback:v=>v+'hr'}},y2:{position:'right',grid:{display:false},min:0,max:110,ticks:{callback:v=>v+'%',font:{size:9}}}}}});
+  }
+
+  buildMtgChart(qGroups.last4);
+  buildBdCharts(qGroups.last4);
+
+  // ════════════════════════════════════════════════════
+  // DIAGNOSIS
+  // ════════════════════════════════════════════════════
+  const fragGrid = document.getElementById('fragGrid');
+  metrics.forEach(m => {
+    const div=document.createElement('div');
+    div.className=`frag-badge ${m.frag}`;
+    div.innerHTML=`<div class="wl">${m.week}</div>${m.frag}<br><span style="font-size:.62rem">${m.activeCats}T</span>`;
+    fragGrid.appendChild(div);
+  });
+
+  const anomBody = document.getElementById('anomalyBody');
+  let hasAnom = false;
+  metrics.forEach(m => {
+    const rows = [];
+    if(m.focusPct<65) rows.push([m.week,'🔴 Focus Critical 專注危急',`Focus ${m.focusPct}% (${m.total_hours}hr)`,'<span class="pill red">Critical</span>']);
+    if(m['Support']>m['Scrum Event']&&!m.interrupted) rows.push([m.week,'Support > Scrum Events 支援超過Scrum',`${m['Support']}hr vs ${m['Scrum Event']}hr`,'<span class="pill orange">Flagged</span>']);
+    if(!m['Discovery']&&!m.interrupted) rows.push([m.week,'No Discovery 無探索時間','0 hr','<span class="pill orange">Flagged</span>']);
+    if(thruMap[m.week]===0&&!m.interrupted) rows.push([m.week,'Zero Throughput 零交付','0 items','<span class="pill red">Flagged</span>']);
+    rows.forEach(([sp,flag,val,st]) => {
+      hasAnom=true;
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td>${sp}</td><td>${flag}</td><td>${val}</td><td>${st}</td>`;
+      anomBody.appendChild(tr);
+    });
+  });
+  if(!hasAnom) {
+    const tr=document.createElement('tr');
+    tr.innerHTML='<td colspan="4" style="color:var(--sub);font-size:.82rem;padding:12px">No anomalies 無異常 ✅</td>';
+    anomBody.appendChild(tr);
+  }
+
+  // ════════════════════════════════════════════════════
+  // INSIGHTS
+  // ════════════════════════════════════════════════════
+  const ins = [];
+  if(below78>0) ins.push({zh:`共 ${below78}/${metrics.length} 個 Sprint 專注時間低於 78% 基準，其中 ${critCount} 週危急（<65%）。建議審視會議結構，保護核心專注時段。`,en:`${below78}/${metrics.length} sprints fell below the 78% focus benchmark; ${critCount} critical (<65%). Review meeting structure to protect focus blocks.`,cls:'warn'});
+  else          ins.push({zh:`所有 Sprint 的專注時間均達到 ≥78% 標準，團隊專注容量健康。`,en:`All sprints met the ≥78% focus benchmark. Focus capacity is healthy.`,cls:'ok'});
+  const zeroThru = sprints.filter(sp=>(thruMap[sp]||0)===0);
+  if(zeroThru.length) ins.push({zh:`${zeroThru.join('、')} 的交付量為 0，建議在 Retrospective 中追蹤共同阻礙原因。`,en:`${zeroThru.join(', ')} had zero throughput. Investigate systemic blockers in Retrospective.`,cls:'warn'});
+  if(goalRate<70)   ins.push({zh:`Goal 達成率僅 ${goalRate}%（目標 ≥70%），建議重新評估 Sprint Goal 設定方式。`,en:`Goal achievement rate is ${goalRate}% (target ≥70%). Review how Sprint Goals are set.`,cls:'warn'});
+  if(commitRate<70) ins.push({zh:`Commit 達成率 ${commitRate}%，可能反映規劃過度承諾或計畫外中斷頻繁。`,en:`Commitment done rate is ${commitRate}%. May reflect over-commitment or frequent unplanned interruptions.`,cls:'warn'});
+
+  const iList = document.getElementById('insightList');
+  ins.forEach(i => {
+    const div=document.createElement('div');
+    div.className=`insight-item ${i.cls}`;
+    div.innerHTML=`<div class="iz">${i.zh}</div><div class="ie">${i.en}</div>`;
+    iList.appendChild(div);
+  });
+}
+
+// ════════════════════════════════════════════════════════════
+// TAB SWITCHING
+// ════════════════════════════════════════════════════════════
+function showTab(n,el){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+n).classList.add('active');
+  el.classList.add('active');
+}
+
+// ════════════════════════════════════════════════════════════
+// START
+// ════════════════════════════════════════════════════════════
+loadAll();
+</script>
+</body>
+</html>
